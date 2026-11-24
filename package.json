@@ -17,6 +17,7 @@
   "scripts": {
     "start": "node src/app.js",
     "test": "jest",
+    "seed": "node src/infrastructure/seed.js",
     "dev": "nodemon src/app.js",
     "lint": "eslint src tests"
   },
