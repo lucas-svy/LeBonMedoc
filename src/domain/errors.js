@@ -19,7 +19,9 @@ class PharmacieOuMedicamentIntrouvable extends Error {
   }
 }
 
-module.exports = { DonneesInvalides, DisponibiliteInsuffisante, PharmacieOuMedicamentIntrouvable };
+
+
+
 class DomainError extends Error {
     constructor(message, details = {}) {
         super(message);
@@ -60,5 +62,8 @@ module.exports = {
     InvalidData,
     InsufficientAvailability,
     UnauthorizedOperation,
-    NotFound
+    NotFound,
+    DonneesInvalides, 
+    DisponibiliteInsuffisante, 
+    PharmacieOuMedicamentIntrouvable
 }
