@@ -1,0 +1,49 @@
+# Dépendances
+node_modules/
+
+# Variables d'environnement (garder uniquement .env.example)
+.env
+.env.*
+!.env.example
+
+# Base de données SQLite locale (le schéma et le seed restent versionnés)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+data/
+
+# Tests et couverture
+coverage/
+.nyc_output/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build
+dist/
+build/
+
+# Cache
+.cache/
+.eslintcache
+.npm/
+
+# Éditeurs
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+
+# Système
+.DS_Store
+Thumbs.db
+desktop.ini

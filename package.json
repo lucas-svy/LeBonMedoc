@@ -1,0 +1,34 @@
+{
+  "name": "lebonmedoc",
+  "version": "1.0.0",
+  "description": "Projet Fictif DomainDrivenDesign",
+  "homepage": "https://github.com/lucas-svy/LeBonMedoc#readme",
+  "bugs": {
+    "url": "https://github.com/lucas-svy/LeBonMedoc/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lucas-svy/LeBonMedoc.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "test": "jest",
+    "seed": "node src/infrastructure/seed.js",
+    "dev": "nodemon src/app.js",
+    "lint": "eslint src tests"
+  },
+  "dependencies": {
+    "eslint": "^10.15.0",
+    "express": "^5.3.0",
+    "nodemon": "^3.1.14",
+    "prettier": "^3.10.1",
+    "supertest": "^7.3.2"
+  },
+  "devDependencies": {
+    "jest": "^30.5.2"
+  }
+}
