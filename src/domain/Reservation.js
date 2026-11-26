@@ -1,33 +1,39 @@
-const { InvalidData } = require("./errors");
-const ReservationStatus = require("./ReservationStatus");
+const { DonneesInvalides, ReservationNonConfirmee, ReservationExpiree, ReservationNonExpiree, TransitionInterdite } = require("./errors");
+const StatutReservation = require("./StatutReservation");
+const DatesReservation = require("./DatesReservation");
 
 
-const FINAL_STATES = [
-  ReservationStatus.REFUSED,
-  ReservationStatus.EXPIRED,
-  ReservationStatus.CANCELLED,
-  ReservationStatus.PICKED_UP,
+const STATUTS_FINAUX = [
+  StatutReservation.REFUSEE,
+  StatutReservation.EXPIREE,
+  StatutReservation.ANNULEE,
+  StatutReservation.RETIREE,
 ];
 
-const CONFIRMED_STATES = [
-  ReservationStatus.CONFIRMED,
-  ReservationStatus.PICKED_UP,
+const STATUTS_CONFIRMES = [
+  StatutReservation.CONFIRMEE,
+  StatutReservation.RETIREE,
+];
+
+const STATUTS_JAMAIS_CONFIRMES = [
+  StatutReservation.EN_ATTENTE,
+  StatutReservation.REFUSEE,
 ];
 
 
-function checkValueCondition(condition, message, details) {
-  if (!condition) throw new InvalidData(message, details);
+function verifier(condition, message, details) {
+  if (!condition) throw new DonneesInvalides(message, details);
 }
 
-function isDateValid(d) {
+function estDateValide(d) {
   return d instanceof Date && !isNaN(d.getTime());
 }
 
-function isDateOrNull(d) {
-  return d === null || isDateValid(d);
+function estDateOuNull(d) {
+  return d === null || estDateValide(d);
 }
 
-function isIdValid(id) {
+function estIdValide(id) {
   return Number.isInteger(id) && id > 0;
 }
 
@@ -40,76 +46,46 @@ class Reservation {
     #medicamentId;
     #quantite;
     #statut;
-    #dateDemande;
-    #dateLimiteReponse;
-    #dateConfirmation;
-    #dateLimiteRetrait;
-    #dateCloture;
+    #dates;
     #motifRefus;
-
-    static #datesVerification({ statut, dateDemande, dateLimiteReponse, dateConfirmation, dateLimiteRetrait, dateCloture}) {
-
-        checkValueCondition(isDateValid(dateDemande), 'Date de demande invalide');
-        checkValueCondition(isDateValid(dateLimiteReponse), 'Date limite de réponse invalide');
-        checkValueCondition(isDateOrNull(dateConfirmation), 'Date de confirmation invalide');
-        checkValueCondition(isDateOrNull(dateLimiteRetrait), 'Date limite de retrait invalide');
-        checkValueCondition(isDateOrNull(dateCloture), 'Date de clôture invalide');
-
-        checkValueCondition(FINAL_STATES.includes(statut) === (dateCloture !== null),
-          'La date de clôture ne correspond pas au statut', { statut });
-
-        checkValueCondition((dateConfirmation === null) === (dateLimiteRetrait === null),
-          'Date de confirmation et date limite de retrait vont ensemble');
-
-        checkValueCondition(!CONFIRMED_STATES.includes(statut) || dateConfirmation !== null,
-          'Une réservation confirmée doit avoir une date de confirmation', { statut });
-
-        const notConfirmed = [ReservationStatus.WAITING, ReservationStatus.REFUSED];
-        checkValueCondition(!notConfirmed.includes(statut) || dateConfirmation === null,
-          'Cette réservation ne peut pas avoir de date de confirmation', { statut });
-
-        checkValueCondition(dateLimiteReponse > dateDemande, 'La date limite de réponse doit être après la demande');
-        if (dateConfirmation) {
-          checkValueCondition(dateConfirmation >= dateDemande, 'La confirmation doit être après la demande');
-          checkValueCondition(dateLimiteRetrait > dateConfirmation, 'La date limite de retrait doit être après la confirmation');
-        }
-        if (dateCloture) {
-          checkValueCondition(dateCloture >= dateDemande, 'La clôture doit être après la demande');
-        }
-    }
 
     constructor({
         id = null,
         patientId, pharmacieId, medicamentId,
         quantite,
         statut,
-        dateDemande, 
-        dateLimiteReponse,
-        dateConfirmation = null, 
-        dateLimiteRetrait = null,
-        dateCloture = null, 
+        dates,
         motifRefus = null,
     }) {
-        checkValueCondition(Number.isInteger(quantite) && quantite > 0, "Quantité invalide", { quantite });
-        checkValueCondition(Object.values(ReservationStatus).includes(statut), 'Statut inconnu', { statut });
+        verifier(Number.isInteger(quantite) && quantite > 0, "Quantité invalide", { quantite });
+        verifier(Object.values(StatutReservation).includes(statut), 'Statut inconnu', { statut });
 
-        const isRefused = statut === ReservationStatus.REFUSED;
+        const estRefusee = statut === StatutReservation.REFUSEE;
 
-        checkValueCondition(
-          !isRefused || (typeof motifRefus === 'string' && motifRefus.trim() !== ''), 'Une réservation refusée doit avoir un motif', { statut }
+        verifier(
+          !estRefusee || (typeof motifRefus === 'string' && motifRefus.trim() !== ''), 'Une réservation refusée doit avoir un motif', { statut }
         );
 
-        checkValueCondition(
-          isRefused || motifRefus === null, 'Seule une réservation refusée peut avoir un motif', { statut }
+        verifier(
+          estRefusee || motifRefus === null, 'Seule une réservation refusée peut avoir un motif', { statut }
         );
 
-        Reservation.#datesVerification({ statut, dateDemande, dateLimiteReponse, dateConfirmation, dateLimiteRetrait, dateCloture });
+        verifier(estIdValide(patientId), "Patient invalide", { patientId });
+        verifier(estIdValide(pharmacieId), "Pharmacie invalide", { pharmacieId });
+        verifier(estIdValide(medicamentId), "Medicament invalide", { medicamentId });
+        verifier(id === null || estIdValide(id), 'Identifiant de réservation invalide', { id });
 
-        checkValueCondition(isIdValid(patientId), "Patient invalide", { patientId });
-        checkValueCondition(isIdValid(pharmacieId), "Pharmacie invalide", { pharmacieId });
-        checkValueCondition(isIdValid(medicamentId), "Medicament invalide", { medicamentId });
-        checkValueCondition(id === null || isIdValid(id), 'Identifiant de réservation invalide', { id });
-        
+        // Règle 8 (2e partie) : cohérence statut <=> dates. C'est une invariante de la réservation.
+        verifier(dates instanceof DatesReservation, 'Dates de réservation invalides');
+
+        verifier(STATUTS_FINAUX.includes(statut) === (dates.dateCloture !== null),
+          'La date de clôture ne correspond pas au statut', { statut });
+
+        verifier(!STATUTS_CONFIRMES.includes(statut) || dates.dateConfirmation !== null,
+          'Une réservation confirmée doit avoir une date de confirmation', { statut });
+
+        verifier(!STATUTS_JAMAIS_CONFIRMES.includes(statut) || dates.dateConfirmation === null,
+          'Cette réservation ne peut pas avoir de date de confirmation', { statut });
 
         this.#id = id;
         this.#patientId = patientId;
@@ -117,11 +93,7 @@ class Reservation {
         this.#medicamentId = medicamentId;
         this.#quantite = quantite;
         this.#statut = statut;
-        this.#dateDemande = dateDemande;
-        this.#dateLimiteReponse = dateLimiteReponse;
-        this.#dateConfirmation = dateConfirmation;
-        this.#dateLimiteRetrait = dateLimiteRetrait;
-        this.#dateCloture = dateCloture;
+        this.#dates = dates;
         this.#motifRefus = motifRefus;
 
     }
@@ -132,16 +104,12 @@ class Reservation {
     get medicamentId() { return this.#medicamentId; }
     get quantite() { return this.#quantite; }
     get statut() { return this.#statut; }
-    get dateDemande() { return this.#dateDemande; }
-    get dateLimiteReponse() { return this.#dateLimiteReponse; }
-    get dateConfirmation() { return this.#dateConfirmation; }
-    get dateLimiteRetrait() { return this.#dateLimiteRetrait; }
-    get dateCloture() { return this.#dateCloture; }
+    get dates() { return this.#dates; }
     get motifRefus() { return this.#motifRefus; }
 
     assignId(id) {
-        checkValueCondition(this.#id === null, 'Cette réservation a déjà un identifiant', { id: this.#id });
-        checkValueCondition(isIdValid(id), 'Identifiant de réservation invalide', { id });
+        verifier(this.#id === null, 'Cette réservation a déjà un identifiant', { id: this.#id });
+        verifier(estIdValide(id), 'Identifiant de réservation invalide', { id });
         this.#id = id;
     }
     
@@ -153,14 +121,18 @@ class Reservation {
             medicamentId: this.#medicamentId,
             quantite: this.#quantite,
             statut: this.#statut,
-            dateDemande: this.#dateDemande,
-            dateLimiteReponse: this.#dateLimiteReponse,
-            dateConfirmation: this.#dateConfirmation,
-            dateLimiteRetrait: this.#dateLimiteRetrait,
-            dateCloture: this.#dateCloture,
+            dateDemande: this.#dates.dateDemande,
+            dateLimiteReponse: this.#dates.dateLimiteReponse,
+            dateConfirmation: this.#dates.dateConfirmation,
+            dateLimiteRetrait: this.#dates.dateLimiteRetrait,
+            dateCloture: this.#dates.dateCloture,
             motifRefus: this.#motifRefus,
         };
     }
+
+    // À écrire : table des transitions, #changerStatut, creer(),
+    // confirmer(), refuser(), annuler(), marquerRetiree(), expirer(), estExpiree().
+
 }
 
 module.exports = Reservation;

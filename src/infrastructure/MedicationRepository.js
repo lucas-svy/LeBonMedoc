@@ -15,7 +15,8 @@ class MedicationRepository {
       codeCIP: row.code_cip,
       nom: row.nom,
       dosage: row.dosage,
-      forme: row.forme,
+      unite: row.unite,
+      uniteParBoite: row.uniteParBoite,
       surOrdonnance: row.sur_ordonnance === 1,
     });
   }

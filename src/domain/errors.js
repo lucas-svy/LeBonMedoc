@@ -1,81 +1,54 @@
-class DonneesInvalides extends Error {
-  constructor(message) {
+// Erreurs métier : une seule classe mère (ErreurDomaine), tout en français.
+// La correspondance erreur -> code HTTP se fait uniquement dans api/errorHandler.js.
+
+class ErreurDomaine extends Error {
+  constructor(message, details = {}) {
     super(message);
-    this.name = "DonneesInvalides";
+    this.name = this.constructor.name; // ex. "TransitionInterdite"
+    this.details = details;
   }
 }
 
-class DisponibiliteInsuffisante extends Error {
-  constructor() {
-    super("La quantité disponible est insuffisante.");
-    this.name = "DisponibiliteInsuffisante";
+class DonneesInvalides extends ErreurDomaine {}
+
+class DisponibiliteInsuffisante extends ErreurDomaine {
+  constructor(message = "La quantité disponible est insuffisante.", details = {}) {
+    super(message, details);
   }
 }
 
-class PharmacieOuMedicamentIntrouvable extends Error {
+class PharmacieOuMedicamentIntrouvable extends ErreurDomaine {
   constructor(options) {
-    super("Pharmacie ou médicament introuvable.", options);
-    this.name = "PharmacieOuMedicamentIntrouvable";
+    super("Pharmacie ou médicament introuvable.");
+    if (options?.cause !== undefined) this.cause = options.cause;
   }
 }
 
+class ElementIntrouvable extends ErreurDomaine {}
 
+class OperationNonAutorisee extends ErreurDomaine {}
 
+class TransitionInterdite extends ErreurDomaine {}
 
-class DomainError extends Error {
-    constructor(message, details = {}) {
-        super(message);
-        this.name = this.constructor.name;   // donne automatiquement "TransitionInterdite", etc.
-        this.details = details;
-    }
-}
+class ReservationExpiree extends ErreurDomaine {}
 
+class ReservationNonExpiree extends ErreurDomaine {}
 
-class ForbiddenTransition extends DomainError {
-
-}
-
-class ExpiredReservation extends DomainError {
-
-}
-
-class InvalidData extends DomainError {
-
-}
-
-class InsufficientAvailability extends DomainError {
-
-}
-
-class UnauthorizedOperation extends DomainError {
-
-}
-
-class NotFound extends DomainError {
-
-}
-
-module.exports = {
-    DomainError,
-    ForbiddenTransition,
-    ExpiredReservation,
-    InvalidData,
-    InsufficientAvailability,
-    UnauthorizedOperation,
-    NotFound,
-    DonneesInvalides, 
-    DisponibiliteInsuffisante, 
-    PharmacieOuMedicamentIntrouvable
-}
-
-class InvalidData extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "DonneesInvalides";
+class ReservationNonConfirmee extends ErreurDomaine {
+  constructor(details = {}) {
+    super("La réservation n'est pas confirmée.", details);
   }
 }
 
 module.exports = {
-  DonneesInvalides: InvalidData,
-  InvalidData,
+  ErreurDomaine,
+  DonneesInvalides,
+  DisponibiliteInsuffisante,
+  PharmacieOuMedicamentIntrouvable,
+  ElementIntrouvable,
+  OperationNonAutorisee,
+  TransitionInterdite,
+  ReservationExpiree,
+  ReservationNonExpiree,
+  ReservationNonConfirmee,
 };

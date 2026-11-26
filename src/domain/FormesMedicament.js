@@ -1,0 +1,12 @@
+const FormesMedicament = Object.freeze({
+  SACHET: 'SACHET',
+  COMPRIME: 'COMPRIME',
+  GELULE: 'GELULE',
+  FLACON: 'FLACON',
+  TUBE: 'TUBE',
+  AEROSOL: 'AEROSOL',
+  SUPPOSITOIRE: 'SUPPOSITOIRE',
+  COMPRIME_EFFERVESCENT: 'COMPRIME_EFFERVESCENT'
+});
+
+module.exports = FormesMedicament;
