@@ -1,4 +1,6 @@
+const Dosage = require("./Dosage");
 const { DonneesInvalides } = require("./errors");
+const Prix = require("./Prix");
 
 class Medicament {
   constructor({
@@ -6,8 +8,8 @@ class Medicament {
     codeCIP,
     nom,
     dosage,
+    prix,
     surOrdonnance,
-    forme = "",
   } = {}) {
     if (typeof codeCIP !== "string" || !/^\d{13}$/.test(codeCIP)) {
       throw new DonneesInvalides(
@@ -19,7 +21,7 @@ class Medicament {
       throw new DonneesInvalides("Le nom du médicament est obligatoire.");
     }
 
-    if (typeof dosage !== "string" || dosage.trim().length === 0) {
+    if (typeof dosage === null) {
       throw new DonneesInvalides("Le dosage du médicament est obligatoire.");
     }
 
@@ -27,18 +29,14 @@ class Medicament {
       throw new DonneesInvalides("surOrdonnance doit être un booléen.");
     }
 
-    if (typeof forme !== "string") {
-      throw new DonneesInvalides(
-        "La forme du médicament doit être une chaîne de caractères.",
-      );
-    }
+
 
     this.id = id;
     this.codeCIP = codeCIP;
     this.nom = nom.trim();
-    this.dosage = dosage.trim();
+    this.dosage = dosage;
     this.surOrdonnance = surOrdonnance;
-    this.forme = forme;
+    this.prix = prix;
   }
 }
 
