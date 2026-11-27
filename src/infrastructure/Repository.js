@@ -17,6 +17,7 @@ function hydraterDisponibilite(ligne) {
   });
 }
 
+/** Chaque requête participe à la transaction éventuellement ouverte sur la connexion fournie. */
 class DisponibiliteRepository {
   #chercherDisponibilite;
   #enregistrerDisponibilite;
