@@ -75,7 +75,6 @@ class Reservation {
         verifier(estIdValide(medicamentId), "Medicament invalide", { medicamentId });
         verifier(id === null || estIdValide(id), 'Identifiant de réservation invalide', { id });
 
-        // Règle 8 (2e partie) : cohérence statut <=> dates. C'est une invariante de la réservation.
         verifier(dates instanceof DatesReservation, 'Dates de réservation invalides');
 
         verifier(STATUTS_FINAUX.includes(statut) === (dates.dateCloture !== null),

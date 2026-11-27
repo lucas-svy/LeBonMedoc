@@ -12,8 +12,6 @@ function estDateOuNull(d) {
   return d === null || estDateValide(d);
 }
 
-// Les Date JS sont mutables : on les copie à l'entrée et à la sortie
-// pour que l'objet-valeur reste réellement immuable.
 function copier(d) {
   return d === null ? null : new Date(d.getTime());
 }
@@ -23,9 +21,10 @@ function memeDate(a, b) {
   return a.getTime() === b.getTime();
 }
 
-// Objet-valeur : les 5 dates d'une réservation.
-// Il ne vérifie que la cohérence des dates entre elles.
-// La cohérence « statut <=> dates » est une invariante de Reservation (règle 8, 2e partie).
+function ajouterMinutes(date, minutes) {
+  return new Date(date.getTime() + minutes * 60_000);
+}
+
 class DatesReservation {
 
     #dateDemande;
@@ -34,7 +33,6 @@ class DatesReservation {
     #dateLimiteRetrait;
     #dateCloture;
 
-    // Reconstruit des dates existantes (depuis la base) : ne calcule rien, valide seulement.
     constructor({
         dateDemande,
         dateLimiteReponse,
@@ -48,11 +46,9 @@ class DatesReservation {
         verifier(estDateOuNull(dateLimiteRetrait), 'Date limite de retrait invalide');
         verifier(estDateOuNull(dateCloture), 'Date de clôture invalide');
 
-        // Confirmation et limite de retrait vont ensemble
         verifier((dateConfirmation === null) === (dateLimiteRetrait === null),
           'Date de confirmation et date limite de retrait vont ensemble');
 
-        // Ordre chronologique
         verifier(dateLimiteReponse > dateDemande, 'La date limite de réponse doit être après la demande');
         if (dateConfirmation !== null) {
           verifier(dateConfirmation >= dateDemande, 'La confirmation doit être après la demande');
@@ -77,7 +73,6 @@ class DatesReservation {
     get dateLimiteRetrait() { return copier(this.#dateLimiteRetrait); }
     get dateCloture() { return copier(this.#dateCloture); }
 
-    // Égalité par valeur : mêmes dates => même valeur.
     equals(autre) {
         return autre instanceof DatesReservation
           && memeDate(this.#dateDemande, autre.#dateDemande)
@@ -85,6 +80,28 @@ class DatesReservation {
           && memeDate(this.#dateConfirmation, autre.#dateConfirmation)
           && memeDate(this.#dateLimiteRetrait, autre.#dateLimiteRetrait)
           && memeDate(this.#dateCloture, autre.#dateCloture);
+    }
+
+    confirmer(maintenant, delaiRetraitMinutes) {
+        verifier(estDateValide(maintenant), 'Date de confirmation invalide');
+        return new DatesReservation({
+            dateDemande: this.#dateDemande,
+            dateLimiteReponse: this.#dateLimiteReponse,
+            dateConfirmation: maintenant,
+            dateLimiteRetrait: ajouterMinutes(maintenant, delaiRetraitMinutes),
+            dateCloture: this.#dateCloture
+        })
+    }
+
+    cloturer(maintenant) {
+        verifier(estDateValide(maintenant), 'Date de cloture invalide');
+        return new DatesReservation({
+            dateDemande: this.#dateDemande,
+            dateLimiteReponse: this.#dateLimiteReponse,
+            dateConfirmation: this.#dateConfirmation,
+            dateLimiteRetrait: this.#dateLimiteRetrait,
+            dateCloture: maintenant
+        })
     }
 }
 
