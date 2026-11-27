@@ -7,8 +7,8 @@ class DisponibiliteService {
     this.#disponibiliteRepository = disponibiliteRepository;
   }
 
-  mettreAJour(pharmacieId, medicamentId, quantite) {
-    const disponibilite = Disponibilite.declarer({ pharmacieId, medicamentId, quantite });
+  mettreAJour(pharmacieId, medicamentId, quantite, maintenant) {
+    const disponibilite = Disponibilite.declarer({ pharmacieId, medicamentId, quantite }, maintenant);
     this.#disponibiliteRepository.save(disponibilite);
     return disponibilite;
   }

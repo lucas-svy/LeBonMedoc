@@ -6,49 +6,93 @@ function validerQuantite(quantite) {
   }
 }
 
+function lireHorodatage(date) {
+  const horodatage = date instanceof Date ? date.getTime() : NaN;
+  if (!Number.isFinite(horodatage)) {
+    throw new DonneesInvalides("La date de mise à jour doit être valide.");
+  }
+  return horodatage;
+}
+
 class Disponibilite {
-  constructor({ pharmacieId, medicamentId, quantiteDisponible, dateMiseAJour = new Date() }) {
+  #pharmacieId;
+  #medicamentId;
+  #quantiteDisponible;
+  #horodatageMiseAJour;
+
+  constructor({ pharmacieId, medicamentId, quantiteDisponible, dateMiseAJour }) {
     if (!Number.isInteger(quantiteDisponible) || quantiteDisponible < 0) {
       throw new DonneesInvalides("Le stock doit être un entier positif ou nul.");
     }
 
-    this.pharmacieId = pharmacieId;
-    this.medicamentId = medicamentId;
-    this.quantiteDisponible = quantiteDisponible;
-    this.dateMiseAJour = dateMiseAJour;
+    this.#pharmacieId = pharmacieId;
+    this.#medicamentId = medicamentId;
+    this.#quantiteDisponible = quantiteDisponible;
+    this.#horodatageMiseAJour = lireHorodatage(dateMiseAJour);
   }
 
-  static declarer({ pharmacieId, medicamentId, quantite }) {
+  get pharmacieId() {
+    return this.#pharmacieId;
+  }
+
+  get medicamentId() {
+    return this.#medicamentId;
+  }
+
+  get quantiteDisponible() {
+    return this.#quantiteDisponible;
+  }
+
+  get dateMiseAJour() {
+    return new Date(this.#horodatageMiseAJour);
+  }
+
+  toJSON() {
+    return {
+      pharmacieId: this.#pharmacieId,
+      medicamentId: this.#medicamentId,
+      quantiteDisponible: this.#quantiteDisponible,
+      dateMiseAJour: this.dateMiseAJour,
+    };
+  }
+
+  static declarer({ pharmacieId, medicamentId, quantite }, maintenant) {
     validerQuantite(quantite);
-    return new Disponibilite({ pharmacieId, medicamentId, quantiteDisponible: quantite });
+    return new Disponibilite({
+      pharmacieId,
+      medicamentId,
+      quantiteDisponible: quantite,
+      dateMiseAJour: maintenant,
+    });
   }
 
   estDisponible(quantite) {
     validerQuantite(quantite);
-    return this.quantiteDisponible >= quantite;
+    return this.#quantiteDisponible >= quantite;
   }
 
-  retirer(quantite) {
+  retirer(quantite, maintenant) {
     if (!this.estDisponible(quantite)) {
       throw new DisponibiliteInsuffisante();
     }
 
-    this.#modifierStock(this.quantiteDisponible - quantite);
+    this.#modifierStock(this.#quantiteDisponible - quantite, maintenant);
   }
 
-  rendre(quantite) {
+  rendre(quantite, maintenant) {
     validerQuantite(quantite);
-    this.#modifierStock(this.quantiteDisponible + quantite);
+    this.#modifierStock(this.#quantiteDisponible + quantite, maintenant);
   }
 
-  mettreAJour(nouvelleQuantite) {
+  mettreAJour(nouvelleQuantite, maintenant) {
     validerQuantite(nouvelleQuantite);
-    this.#modifierStock(nouvelleQuantite);
+    this.#modifierStock(nouvelleQuantite, maintenant);
   }
 
-  #modifierStock(quantite) {
-    this.quantiteDisponible = quantite;
-    this.dateMiseAJour = new Date();
+  #modifierStock(quantite, maintenant) {
+    const horodatage = lireHorodatage(maintenant);
+    this.#quantiteDisponible = quantite;
+    this.#horodatageMiseAJour = horodatage;
   }
 }
 
