@@ -1,42 +1,8 @@
 const { DonneesInvalides, ReservationNonConfirmee, ReservationExpiree, ReservationNonExpiree, TransitionInterdite } = require("./errors");
 const StatutReservation = require("./StatutReservation");
 const DatesReservation = require("./DatesReservation");
-
-
-const STATUTS_FINAUX = [
-  StatutReservation.REFUSEE,
-  StatutReservation.EXPIREE,
-  StatutReservation.ANNULEE,
-  StatutReservation.RETIREE,
-];
-
-const STATUTS_CONFIRMES = [
-  StatutReservation.CONFIRMEE,
-  StatutReservation.RETIREE,
-];
-
-const STATUTS_JAMAIS_CONFIRMES = [
-  StatutReservation.EN_ATTENTE,
-  StatutReservation.REFUSEE,
-];
-
-
-function verifier(condition, message, details) {
-  if (!condition) throw new DonneesInvalides(message, details);
-}
-
-function estDateValide(d) {
-  return d instanceof Date && !isNaN(d.getTime());
-}
-
-function estDateOuNull(d) {
-  return d === null || estDateValide(d);
-}
-
-function estIdValide(id) {
-  return Number.isInteger(id) && id > 0;
-}
-
+const { verifier, estIdValide } = require("./Validations");
+const { STATUTS_FINAUX, STATUTS_CONFIRMES, STATUTS_JAMAIS_CONFIRMES, TRANSITIONS } = require("./TransitionsReservation");
 
 class Reservation {
 
@@ -57,9 +23,86 @@ class Reservation {
         dates,
         motifRefus = null,
     }) {
+        Reservation.#verifierChamps({ id, patientId, pharmacieId, medicamentId, quantite, statut });
+        Reservation.#verifierMotifRefus(statut, motifRefus);
+        Reservation.#verifierCoherenceStatutDates(statut, dates);
+
+        this.#id = id;
+        this.#patientId = patientId;
+        this.#pharmacieId = pharmacieId;
+        this.#medicamentId = medicamentId;
+        this.#quantite = quantite;
+        this.#statut = statut;
+        this.#dates = dates;
+        this.#motifRefus = motifRefus;
+    }
+
+    static creer({
+      patientId, 
+      pharmacieId, 
+      medicamentId, 
+      quantite, 
+      maintenant, 
+      delaiReponseMinutes
+    }) {
+      return new Reservation({
+        id: null,
+        patientId: patientId,
+        pharmacieId: pharmacieId,
+        medicamentId: medicamentId,
+        quantite: quantite,
+        statut: StatutReservation.EN_ATTENTE,
+        dates: DatesReservation.nouvelle(maintenant, delaiReponseMinutes),
+        motifRefus: null
+      })
+    }
+
+
+    get id() { return this.#id; }
+    get patientId() { return this.#patientId; }
+    get pharmacieId() { return this.#pharmacieId; }
+    get medicamentId() { return this.#medicamentId; }
+    get quantite() { return this.#quantite; }
+    get statut() { return this.#statut; }
+    get dates() { return this.#dates; }
+    get motifRefus() { return this.#motifRefus; }
+    
+
+    #verifierTransition(nouveau) {
+      if (!TRANSITIONS[this.#statut].includes(nouveau)) {
+        throw new TransitionInterdite(
+          `Transition interdite : ${this.#statut} -> ${nouveau}`,
+          { de: this.#statut, vers: nouveau },
+        );
+      }
+    }
+
+    #changerStatut(nouveau) {
+      this.#verifierTransition(nouveau);
+      this.#statut = nouveau;
+    }
+
+    confirmer(maintenant, delaiRetraitMinutes) {
+      this.#verifierTransition(StatutReservation.CONFIRMEE);
+      if (this.#dates.reponseDepassee(maintenant)) {
+        throw new ReservationExpiree("La date limite de réponse est dépassée", {dateLimiteReponse: this.#dates.dateLimiteReponse, maintenant});
+      }
+      const nouvellesDates = this.#dates.confirmer(maintenant, delaiRetraitMinutes);
+      this.#changerStatut(StatutReservation.CONFIRMEE);
+      this.#dates = nouvellesDates;
+    }
+
+    static #verifierChamps({ id, patientId, pharmacieId, medicamentId, quantite, statut }) {
         verifier(Number.isInteger(quantite) && quantite > 0, "Quantité invalide", { quantite });
         verifier(Object.values(StatutReservation).includes(statut), 'Statut inconnu', { statut });
 
+        verifier(estIdValide(patientId), "Patient invalide", { patientId });
+        verifier(estIdValide(pharmacieId), "Pharmacie invalide", { pharmacieId });
+        verifier(estIdValide(medicamentId), "Medicament invalide", { medicamentId });
+        verifier(id === null || estIdValide(id), 'Identifiant de réservation invalide', { id });
+    }
+
+    static #verifierMotifRefus(statut, motifRefus) {
         const estRefusee = statut === StatutReservation.REFUSEE;
 
         verifier(
@@ -69,12 +112,9 @@ class Reservation {
         verifier(
           estRefusee || motifRefus === null, 'Seule une réservation refusée peut avoir un motif', { statut }
         );
+    }
 
-        verifier(estIdValide(patientId), "Patient invalide", { patientId });
-        verifier(estIdValide(pharmacieId), "Pharmacie invalide", { pharmacieId });
-        verifier(estIdValide(medicamentId), "Medicament invalide", { medicamentId });
-        verifier(id === null || estIdValide(id), 'Identifiant de réservation invalide', { id });
-
+    static #verifierCoherenceStatutDates(statut, dates) {
         verifier(dates instanceof DatesReservation, 'Dates de réservation invalides');
 
         verifier(STATUTS_FINAUX.includes(statut) === (dates.dateCloture !== null),
@@ -85,26 +125,10 @@ class Reservation {
 
         verifier(!STATUTS_JAMAIS_CONFIRMES.includes(statut) || dates.dateConfirmation === null,
           'Cette réservation ne peut pas avoir de date de confirmation', { statut });
-
-        this.#id = id;
-        this.#patientId = patientId;
-        this.#pharmacieId = pharmacieId;
-        this.#medicamentId = medicamentId;
-        this.#quantite = quantite;
-        this.#statut = statut;
-        this.#dates = dates;
-        this.#motifRefus = motifRefus;
-
     }
 
-    get id() { return this.#id; }
-    get patientId() { return this.#patientId; }
-    get pharmacieId() { return this.#pharmacieId; }
-    get medicamentId() { return this.#medicamentId; }
-    get quantite() { return this.#quantite; }
-    get statut() { return this.#statut; }
-    get dates() { return this.#dates; }
-    get motifRefus() { return this.#motifRefus; }
+
+
 
     assignId(id) {
         verifier(this.#id === null, 'Cette réservation a déjà un identifiant', { id: this.#id });
@@ -129,7 +153,7 @@ class Reservation {
         };
     }
 
-    // À écrire : table des transitions, #changerStatut, creer(),
+    // À écrire :
     // confirmer(), refuser(), annuler(), marquerRetiree(), expirer(), estExpiree().
 
 }

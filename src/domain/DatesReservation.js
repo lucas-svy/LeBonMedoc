@@ -82,6 +82,19 @@ class DatesReservation {
           && memeDate(this.#dateCloture, autre.#dateCloture);
     }
 
+
+    static nouvelle(maintenant, delaiReponseMinutes) { 
+        verifier(estDateValide(maintenant), 'Date de demande invalide');
+        return new DatesReservation({
+            dateDemande: maintenant,
+            dateLimiteReponse: ajouterMinutes(maintenant, delaiReponseMinutes),
+            dateConfirmation: null,
+            dateLimiteRetrait: null,
+            dateCloture: null
+        })
+    }
+
+
     confirmer(maintenant, delaiRetraitMinutes) {
         verifier(estDateValide(maintenant), 'Date de confirmation invalide');
         return new DatesReservation({
@@ -102,6 +115,18 @@ class DatesReservation {
             dateLimiteRetrait: this.#dateLimiteRetrait,
             dateCloture: maintenant
         })
+    }
+
+    
+
+    reponseDepassee(maintenant) {
+        verifier(estDateValide(maintenant), 'Date courante invalide');
+        return maintenant > this.#dateLimiteReponse;
+    }
+
+    retraitDepasse(maintenant) {
+        verifier(estDateValide(maintenant), 'Date courante invalide');
+        return this.#dateLimiteRetrait !== null && maintenant > this.#dateLimiteRetrait;
     }
 }
 

@@ -1,7 +1,7 @@
 const Reservation = require("../../src/domain/Reservation");
 const DatesReservation = require("../../src/domain/DatesReservation");
 const StatutReservation = require("../../src/domain/StatutReservation");
-const { DonneesInvalides } = require("../../src/domain/errors");
+const { DonneesInvalides, TransitionInterdite, ReservationExpiree } = require("../../src/domain/errors");
 
 // Dates fixes : jamais de new Date() dans les tests.
 const T = (h) => new Date(`2026-01-01T${h}:00Z`);
@@ -210,6 +210,224 @@ describe("Reservation - toJSON", () => {
       dateLimiteRetrait: null,
       dateCloture: null,
       motifRefus: null,
+    });
+  });
+});
+
+describe("Reservation - creer", () => {
+  function parametresCreer(modifs = {}) {
+    return {
+      patientId: 1,
+      pharmacieId: 2,
+      medicamentId: 3,
+      quantite: 2,
+      maintenant: T("10:00"),
+      delaiReponseMinutes: 120,
+      ...modifs,
+    };
+  }
+
+  test("crée une réservation en attente sans identifiant", () => {
+    const r = Reservation.creer(parametresCreer());
+    expect(r).toBeInstanceOf(Reservation);
+    expect(r.statut).toBe(StatutReservation.EN_ATTENTE);
+    expect(r.id).toBeNull();
+    expect(r.motifRefus).toBeNull();
+  });
+
+  test("reprend les identifiants et la quantité", () => {
+    const r = Reservation.creer(parametresCreer());
+    expect(r.patientId).toBe(1);
+    expect(r.pharmacieId).toBe(2);
+    expect(r.medicamentId).toBe(3);
+    expect(r.quantite).toBe(2);
+  });
+
+  test("fixe la demande à maintenant et la limite de réponse à maintenant + délai", () => {
+    const r = Reservation.creer(parametresCreer());
+    expect(r.dates.dateDemande).toEqual(T("10:00"));
+    expect(r.dates.dateLimiteReponse).toEqual(T("12:00"));
+  });
+
+  test("utilise le délai de réponse donné", () => {
+    const r = Reservation.creer(parametresCreer({ delaiReponseMinutes: 30 }));
+    expect(r.dates.dateLimiteReponse).toEqual(T("10:30"));
+  });
+
+  test("la confirmation, la limite de retrait et la clôture sont null", () => {
+    const r = Reservation.creer(parametresCreer());
+    expect(r.dates.dateConfirmation).toBeNull();
+    expect(r.dates.dateLimiteRetrait).toBeNull();
+    expect(r.dates.dateCloture).toBeNull();
+  });
+
+  test.each([0, -1, 1.5, "2", null, undefined])("refuse la quantité %p", (quantite) => {
+    expect(() => Reservation.creer(parametresCreer({ quantite }))).toThrow(DonneesInvalides);
+  });
+
+  test.each([0, -1, 1.5, "1", null, undefined])("refuse un patientId %p", (patientId) => {
+    expect(() => Reservation.creer(parametresCreer({ patientId }))).toThrow(DonneesInvalides);
+  });
+
+  test.each([0, -1, 1.5, "1", null, undefined])("refuse un pharmacieId %p", (pharmacieId) => {
+    expect(() => Reservation.creer(parametresCreer({ pharmacieId }))).toThrow(DonneesInvalides);
+  });
+
+  test.each([0, -1, 1.5, "1", null, undefined])("refuse un medicamentId %p", (medicamentId) => {
+    expect(() => Reservation.creer(parametresCreer({ medicamentId }))).toThrow(DonneesInvalides);
+  });
+
+  test.each([0, -5, "abc", null, undefined])("refuse le délai de réponse %p", (delaiReponseMinutes) => {
+    expect(() => Reservation.creer(parametresCreer({ delaiReponseMinutes }))).toThrow(DonneesInvalides);
+  });
+
+  test.each([undefined, null, "10:00", new Date("n'importe quoi")])(
+    "refuse un maintenant invalide (%p)",
+    (maintenant) => {
+      expect(() => Reservation.creer(parametresCreer({ maintenant }))).toThrow(DonneesInvalides);
+    },
+  );
+});
+
+// Fabrique une réservation dans le statut voulu, avec des dates cohérentes (règle 8).
+// Dates : demande 10:00, limite de réponse 12:00, confirmation 11:00, limite de retrait 23:00, clôture 13:00.
+function reservationEnStatut(statut) {
+  const modifsDates = {
+    [StatutReservation.EN_ATTENTE]: {},
+    [StatutReservation.CONFIRMEE]: confirmation,
+    [StatutReservation.REFUSEE]: cloture,
+    [StatutReservation.EXPIREE]: cloture,
+    [StatutReservation.ANNULEE]: cloture,
+    [StatutReservation.RETIREE]: { ...confirmation, ...cloture },
+  }[statut];
+
+  return new Reservation(donneesValides({
+    statut,
+    dates: datesValides(modifsDates),
+    motifRefus: statut === StatutReservation.REFUSEE ? "Indisponible" : null,
+  }));
+}
+
+describe("Reservation - confirmer", () => {
+  const MAINTENANT = T("11:00");   // avant la limite de réponse (12:00)
+  const DELAI_RETRAIT = 60;        // limite de retrait : 12:00
+
+  describe("depuis EN_ATTENTE", () => {
+    test("passe au statut CONFIRMEE", () => {
+      const r = reservationEnStatut(StatutReservation.EN_ATTENTE);
+      r.confirmer(MAINTENANT, DELAI_RETRAIT);
+      expect(r.statut).toBe(StatutReservation.CONFIRMEE);
+    });
+
+    test("fixe la confirmation à maintenant et la limite de retrait à maintenant + délai", () => {
+      const r = reservationEnStatut(StatutReservation.EN_ATTENTE);
+      r.confirmer(MAINTENANT, DELAI_RETRAIT);
+      expect(r.dates.dateConfirmation).toEqual(T("11:00"));
+      expect(r.dates.dateLimiteRetrait).toEqual(T("12:00"));
+    });
+
+    test("garde la demande, la limite de réponse et la clôture", () => {
+      const r = reservationEnStatut(StatutReservation.EN_ATTENTE);
+      r.confirmer(MAINTENANT, DELAI_RETRAIT);
+      expect(r.dates.dateDemande).toEqual(T("10:00"));
+      expect(r.dates.dateLimiteReponse).toEqual(T("12:00"));
+      expect(r.dates.dateCloture).toBeNull();
+    });
+
+    test("ne change ni la quantité, ni les identifiants, ni le motif", () => {
+      const r = reservationEnStatut(StatutReservation.EN_ATTENTE);
+      r.confirmer(MAINTENANT, DELAI_RETRAIT);
+      expect(r.quantite).toBe(2);
+      expect(r.patientId).toBe(1);
+      expect(r.pharmacieId).toBe(2);
+      expect(r.medicamentId).toBe(3);
+      expect(r.motifRefus).toBeNull();
+    });
+
+    test("accepte la confirmation exactement à la limite de réponse", () => {
+      const r = reservationEnStatut(StatutReservation.EN_ATTENTE);
+      expect(() => r.confirmer(T("12:00"), DELAI_RETRAIT)).not.toThrow();
+      expect(r.statut).toBe(StatutReservation.CONFIRMEE);
+    });
+  });
+
+  describe("transitions interdites", () => {
+    test("refuse de confirmer deux fois (opération répétée)", () => {
+      const r = reservationEnStatut(StatutReservation.EN_ATTENTE);
+      r.confirmer(MAINTENANT, DELAI_RETRAIT);
+      expect(() => r.confirmer(T("11:30"), DELAI_RETRAIT)).toThrow(TransitionInterdite);
+    });
+
+    test("la deuxième confirmation ne modifie rien", () => {
+      const r = reservationEnStatut(StatutReservation.EN_ATTENTE);
+      r.confirmer(MAINTENANT, DELAI_RETRAIT);
+      const avant = r.dates;
+      expect(() => r.confirmer(T("11:30"), 120)).toThrow(TransitionInterdite);
+      expect(r.statut).toBe(StatutReservation.CONFIRMEE);
+      expect(r.dates.equals(avant)).toBe(true);
+    });
+
+    test.each([
+      StatutReservation.CONFIRMEE,
+      StatutReservation.REFUSEE,
+      StatutReservation.EXPIREE,
+      StatutReservation.ANNULEE,
+      StatutReservation.RETIREE,
+    ])("refuse de confirmer une réservation %s", (statut) => {
+      const r = reservationEnStatut(statut);
+      const avant = r.dates;
+      expect(() => r.confirmer(MAINTENANT, DELAI_RETRAIT)).toThrow(TransitionInterdite);
+      expect(r.statut).toBe(statut);
+      expect(r.dates.equals(avant)).toBe(true);
+    });
+
+    test("donne TransitionInterdite (et non ReservationExpiree) sur une réservation déjà finie, même après la limite", () => {
+      const r = reservationEnStatut(StatutReservation.REFUSEE);
+      expect(() => r.confirmer(T("15:00"), DELAI_RETRAIT)).toThrow(TransitionInterdite);
+    });
+  });
+
+  describe("réservation expirée (règle 6)", () => {
+    test("refuse de confirmer après la limite de réponse", () => {
+      const r = reservationEnStatut(StatutReservation.EN_ATTENTE);
+      expect(() => r.confirmer(T("12:01"), DELAI_RETRAIT)).toThrow(ReservationExpiree);
+    });
+
+    test("ne change rien quand la réservation est expirée", () => {
+      const r = reservationEnStatut(StatutReservation.EN_ATTENTE);
+      const avant = r.dates;
+      expect(() => r.confirmer(T("12:01"), DELAI_RETRAIT)).toThrow(ReservationExpiree);
+      expect(r.statut).toBe(StatutReservation.EN_ATTENTE);
+      expect(r.dates.equals(avant)).toBe(true);
+    });
+  });
+
+  describe("données invalides (la réservation reste inchangée)", () => {
+    test.each([0, -5, "abc", null, undefined])("refuse le délai de retrait %p", (delai) => {
+      const r = reservationEnStatut(StatutReservation.EN_ATTENTE);
+      const avant = r.dates;
+      expect(() => r.confirmer(MAINTENANT, delai)).toThrow(DonneesInvalides);
+      expect(r.statut).toBe(StatutReservation.EN_ATTENTE);
+      expect(r.dates.equals(avant)).toBe(true);
+    });
+
+    test.each([undefined, null, "11:00", new Date("n'importe quoi")])(
+      "refuse un maintenant invalide (%p)",
+      (maintenant) => {
+        const r = reservationEnStatut(StatutReservation.EN_ATTENTE);
+        const avant = r.dates;
+        expect(() => r.confirmer(maintenant, DELAI_RETRAIT)).toThrow(DonneesInvalides);
+        expect(r.statut).toBe(StatutReservation.EN_ATTENTE);
+        expect(r.dates.equals(avant)).toBe(true);
+      },
+    );
+
+    test("refuse une confirmation avant la demande", () => {
+      const r = reservationEnStatut(StatutReservation.EN_ATTENTE);
+      const avant = r.dates;
+      expect(() => r.confirmer(T("09:00"), DELAI_RETRAIT)).toThrow(DonneesInvalides);
+      expect(r.statut).toBe(StatutReservation.EN_ATTENTE);
+      expect(r.dates.equals(avant)).toBe(true);
     });
   });
 });
