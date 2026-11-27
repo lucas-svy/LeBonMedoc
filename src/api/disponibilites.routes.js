@@ -17,7 +17,12 @@ function creerDisponibilitesRouter({ disponibiliteService, rechercheService }) {
   router.put(`${cheminDisponibilitesPharmacie}/:medicamentId`, (req, res) => {
     const pharmacieId = lireIdentifiant(req.params.id, "L’identifiant de pharmacie");
     const medicamentId = lireIdentifiant(req.params.medicamentId, "L’identifiant de médicament");
-    const disponibilite = disponibiliteService.mettreAJour(pharmacieId, medicamentId, req.body?.quantite);
+    const disponibilite = disponibiliteService.mettreAJour(
+      pharmacieId,
+      medicamentId,
+      req.body?.quantite,
+      new Date(),
+    );
     res.json(disponibilite);
   });
 
